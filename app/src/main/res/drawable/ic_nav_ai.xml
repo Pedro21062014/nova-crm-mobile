@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Big 4-point AI Star / Nova Sparkle -->
+    <path
+        android:fillColor="#8B5CF6"
+        android:pathData="M12,2 C12.5,7 17,11.5 22,12 C17,12.5 12.5,17 12,22 C11.5,17 7,12.5 2,12 C7,11.5 11.5,7 12,2 Z" />
+    <!-- Secondary Little Star top-right -->
+    <path
+        android:fillColor="#EC4899"
+        android:pathData="M19,3 C19.3,5 21,6.7 23,7 C21,7.3 19.3,9 19,11 C18.7,9 17,7.3 17,7 C17,6.7 18.7,5 19,3 Z" />
+    <!-- Micro Star bottom-left -->
+    <path
+        android:fillColor="#38BDF8"
+        android:pathData="M5,15 C5.2,16.5 6.5,17.8 8,18 C6.5,18.2 5.2,19.5 5,21 C4.8,19.5 3.5,18.2 2,18 C3.5,17.8 4.8,16.5 5,15 Z" />
+    <!-- Center Core Glow -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M12,10 A2,2 0 1,1 12,14 A2,2 0 1,1 12,10 Z" />
+</vector>

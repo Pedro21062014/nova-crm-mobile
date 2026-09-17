@@ -1,0 +1,6 @@
+{
+  "name": "Nova CRM Mobile",
+  "description": "Companion app for Nova CRM, managing clients, products, orders, real-time chats, and featuring DeepSeek AI integration.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
