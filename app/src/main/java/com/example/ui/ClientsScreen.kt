@@ -1,5 +1,6 @@
 package com.example.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -9,9 +10,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
@@ -34,6 +37,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.example.Client
 import com.example.CrmUiState
 import com.example.CrmViewModel
@@ -146,56 +151,63 @@ fun ClientsScreen(
             },
             containerColor = CosmicBackground
         ) { padding ->
-            Column(
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(padding)
-                    .padding(horizontal = 16.dp)
+                    .padding(padding),
+                contentAlignment = Alignment.TopCenter
             ) {
-                Text(
-                    text = "Seus clientes integrados no CRM",
-                    fontSize = 14.sp,
-                    color = TextMuted,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(vertical = 12.dp)
-                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .widthIn(max = 760.dp)
+                        .padding(horizontal = 16.dp)
+                ) {
+                    Text(
+                        text = "Seus clientes integrados no CRM",
+                        fontSize = 14.sp,
+                        color = TextMuted,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.padding(vertical = 12.dp)
+                    )
 
-                if (state.clients.isEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
-                                imageVector = Icons.Default.Groups,
-                                contentDescription = "Sem clientes",
-                                tint = TextMuted,
-                                modifier = Modifier.size(64.dp)
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Text(
-                                "Nenhum cliente cadastrado ainda.",
-                                fontSize = 14.sp,
-                                color = TextMuted
-                            )
+                    if (state.clients.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(
+                                    imageVector = Icons.Default.Groups,
+                                    contentDescription = "Sem clientes",
+                                    tint = TextMuted,
+                                    modifier = Modifier.size(64.dp)
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text(
+                                    "Nenhum cliente cadastrado ainda.",
+                                    fontSize = 14.sp,
+                                    color = TextMuted
+                                )
+                            }
                         }
-                    }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth()
-                            .testTag("clients_list"),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                        contentPadding = PaddingValues(bottom = 80.dp)
-                    ) {
-                        items(state.clients.reversed(), key = { it.id }) { item ->
-                            ClientCardRow(
-                                client = item,
-                                onOpenChat = { activeChatClient = item }
-                            )
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                                .testTag("clients_list"),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            contentPadding = PaddingValues(bottom = 84.dp)
+                        ) {
+                            items(state.clients.reversed(), key = { it.id }) { item ->
+                                ClientCardRow(
+                                    client = item,
+                                    onOpenChat = { activeChatClient = item }
+                                )
+                            }
                         }
                     }
                 }
@@ -203,113 +215,158 @@ fun ClientsScreen(
         }
     }
 
-    // Modal dialogue add Client
+    // Responsive Modal dialogue add Client
     if (showAddDialog) {
-        AlertDialog(
+        Dialog(
             onDismissRequest = { showAddDialog = false },
-            title = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.GroupAdd,
-                        contentDescription = "Novo Cliente",
-                        tint = CosmicPrimary,
-                        modifier = Modifier.padding(end = 8.dp)
-                    )
-                    Text("Adicionar Cliente", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.onSurface)
-                }
-            },
-            text = {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                    modifier = Modifier.width(300.dp)
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            BoxWithConstraints(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .imePadding()
+                    .padding(horizontal = 16.dp, vertical = 20.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(24.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 4.dp,
+                    shadowElevation = 12.dp,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .widthIn(max = 460.dp)
+                        .heightIn(max = maxHeight)
                 ) {
-                    if (formError != null) {
-                        Text(
-                            text = formError!!,
-                            color = MaterialTheme.colorScheme.error,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    OutlinedTextField(
-                        value = clientName,
-                        onValueChange = { clientName = it },
-                        label = { Text("Nome completo") },
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .testTag("new_client_name_input"),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = CosmicPrimary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                        )
-                    )
+                            .padding(horizontal = 20.dp, vertical = 18.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.GroupAdd,
+                                contentDescription = "Novo Cliente",
+                                tint = CosmicPrimary,
+                                modifier = Modifier.padding(end = 8.dp)
+                            )
+                            Text(
+                                "Adicionar Cliente",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 18.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
 
-                    OutlinedTextField(
-                        value = clientEmail,
-                        onValueChange = { clientEmail = it },
-                        label = { Text("E-mail corporativo") },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("new_client_email_input"),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = CosmicPrimary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                        )
-                    )
+                        Spacer(modifier = Modifier.height(12.dp))
 
-                    OutlinedTextField(
-                        value = clientPhone,
-                        onValueChange = { clientPhone = it },
-                        label = { Text("Telefone / WhatsApp") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("new_client_phone_input"),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = CosmicPrimary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                        )
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (clientName.isBlank() || clientEmail.isBlank() || clientPhone.isBlank()) {
-                            formError = "Preencha todos os campos obrigatórios."
-                        } else if (!clientEmail.contains("@")) {
-                            formError = "Insira um e-mail válido."
-                        } else {
-                            crmViewModel.addClient(
-                                name = clientName.trim(),
-                                email = clientEmail.trim(),
-                                phone = clientPhone.trim()
-                            ) { success ->
-                                if (success) {
-                                    showAddDialog = false
-                                } else {
-                                    formError = "Falha ao cadastrar cliente no Firestore."
-                                }
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f, fill = false)
+                                .verticalScroll(rememberScrollState())
+                        ) {
+                            if (formError != null) {
+                                Text(
+                                    text = formError!!,
+                                    color = MaterialTheme.colorScheme.error,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+
+                            OutlinedTextField(
+                                value = clientName,
+                                onValueChange = { clientName = it },
+                                label = { Text("Nome completo", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("new_client_name_input"),
+                                singleLine = true,
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = CosmicPrimary,
+                                    unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                                )
+                            )
+
+                            OutlinedTextField(
+                                value = clientEmail,
+                                onValueChange = { clientEmail = it },
+                                label = { Text("E-mail corporativo", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("new_client_email_input"),
+                                singleLine = true,
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = CosmicPrimary,
+                                    unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                                )
+                            )
+
+                            OutlinedTextField(
+                                value = clientPhone,
+                                onValueChange = { clientPhone = it },
+                                label = { Text("Telefone / WhatsApp", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("new_client_phone_input"),
+                                singleLine = true,
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = CosmicPrimary,
+                                    unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                                )
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            TextButton(
+                                onClick = { showAddDialog = false },
+                                modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                            ) {
+                                Text("CANCELAR", color = CosmicPrimary, fontWeight = FontWeight.Bold)
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Button(
+                                onClick = {
+                                    if (clientName.isBlank() || clientEmail.isBlank() || clientPhone.isBlank()) {
+                                        formError = "Preencha todos os campos obrigatórios."
+                                    } else if (!clientEmail.contains("@")) {
+                                        formError = "Insira um e-mail válido."
+                                    } else {
+                                        crmViewModel.addClient(
+                                            name = clientName.trim(),
+                                            email = clientEmail.trim(),
+                                            phone = clientPhone.trim()
+                                        ) { success ->
+                                            if (success) {
+                                                showAddDialog = false
+                                            } else {
+                                                formError = "Falha ao cadastrar cliente no Firestore."
+                                            }
+                                        }
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = CosmicPrimary),
+                                modifier = Modifier
+                                    .defaultMinSize(minHeight = 48.dp)
+                                    .testTag("submit_client_button")
+                            ) {
+                                Text("CADASTRAR", fontWeight = FontWeight.Bold, color = Color.White)
                             }
                         }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = CosmicPrimary),
-                    modifier = Modifier.testTag("submit_client_button")
-                ) {
-                    Text("CADASTRAR", fontWeight = FontWeight.Bold, color = Color.White)
+                    }
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { showAddDialog = false }) {
-                    Text("CANCELAR", color = CosmicPrimary, fontWeight = FontWeight.Bold)
-                }
-            },
-            containerColor = MaterialTheme.colorScheme.surface
-        )
+            }
+        }
     }
 }
 
@@ -396,6 +453,8 @@ fun RealtimeSupportChatPanel(
 
     val chatListState = rememberLazyListState()
 
+    BackHandler(onBack = onBackClick)
+
     // Scroll to bottom when real-time messages arrive
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
@@ -412,7 +471,9 @@ fun RealtimeSupportChatPanel(
                             text = client.name,
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onBackground
+                            color = MaterialTheme.colorScheme.onBackground,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                         // Dynamic Typing status (RTDB status mapped)
                         AnimatedVisibility(
@@ -445,7 +506,7 @@ fun RealtimeSupportChatPanel(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .navigationBarsPadding()
+                .imePadding()
         ) {
             // Live Messages Stream list view
             LazyColumn(
@@ -575,56 +636,59 @@ fun SupportChatBubble(message: Message) {
         ))
     } else Modifier
 
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = if (isMerchant) Arrangement.End else Arrangement.Start
-    ) {
-        if (!isMerchant) {
-            Box(
-                modifier = Modifier
-                    .size(24.dp)
-                    .background(CosmicSecondary.copy(alpha = 0.15f), CircleShape)
-                    .border(1.dp, CosmicSecondary.copy(alpha = 0.3f), CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("CL", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = CosmicSecondary)
-            }
-            Spacer(modifier = Modifier.width(6.dp))
-        }
-
-        Surface(
-            color = bubbleColor,
-            shape = RoundedCornerShape(
-                topStart = 14.dp,
-                topEnd = 14.dp,
-                bottomStart = if (isMerchant) 14.dp else 2.dp,
-                bottomEnd = if (isMerchant) 2.dp else 14.dp
-            ),
-            modifier = Modifier
-                .widthIn(max = 240.dp)
-                .then(bubbleBorderModifier),
-            shadowElevation = 1.dp
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val maxBubbleWidth = (maxWidth * 0.78f).coerceAtMost(420.dp)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = if (isMerchant) Arrangement.End else Arrangement.Start
         ) {
-            Column(modifier = Modifier.padding(10.dp)) {
-                Text(
-                    text = message.text,
-                    fontSize = 12.sp,
-                    color = textColor,
-                    lineHeight = 16.sp
-                )
-                Text(
-                    text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(message.timestamp)),
-                    fontSize = 8.sp,
-                    color = TextMuted,
+            if (!isMerchant) {
+                Box(
                     modifier = Modifier
-                        .padding(top = 4.dp)
-                        .align(Alignment.End)
-                )
+                        .size(24.dp)
+                        .background(CosmicSecondary.copy(alpha = 0.15f), CircleShape)
+                        .border(1.dp, CosmicSecondary.copy(alpha = 0.3f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("CL", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = CosmicSecondary)
+                }
+                Spacer(modifier = Modifier.width(6.dp))
             }
-        }
 
-        if (isMerchant) {
-            Spacer(modifier = Modifier.width(6.dp))
+            Surface(
+                color = bubbleColor,
+                shape = RoundedCornerShape(
+                    topStart = 14.dp,
+                    topEnd = 14.dp,
+                    bottomStart = if (isMerchant) 14.dp else 2.dp,
+                    bottomEnd = if (isMerchant) 2.dp else 14.dp
+                ),
+                modifier = Modifier
+                    .widthIn(max = maxBubbleWidth)
+                    .then(bubbleBorderModifier),
+                shadowElevation = 1.dp
+            ) {
+                Column(modifier = Modifier.padding(10.dp)) {
+                    Text(
+                        text = message.text,
+                        fontSize = 12.sp,
+                        color = textColor,
+                        lineHeight = 16.sp
+                    )
+                    Text(
+                        text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(message.timestamp)),
+                        fontSize = 8.sp,
+                        color = if (isMerchant) Color.White.copy(alpha = 0.75f) else TextMuted,
+                        modifier = Modifier
+                            .padding(top = 4.dp)
+                            .align(Alignment.End)
+                    )
+                }
+            }
+
+            if (isMerchant) {
+                Spacer(modifier = Modifier.width(6.dp))
+            }
         }
     }
 }

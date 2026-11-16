@@ -3,6 +3,7 @@ package com.example.ui
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -11,8 +12,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.automirrored.filled.Send
@@ -37,6 +40,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -217,169 +221,201 @@ fun MoreServicesScreen(
         },
         containerColor = CosmicBackground
     ) { innerPadding ->
-        LazyColumn(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-            contentPadding = PaddingValues(top = 8.dp, bottom = 40.dp)
+                .padding(innerPadding),
+            contentAlignment = Alignment.TopCenter
         ) {
-            // 1. Chat & Support Group
-            item {
-                SectionTitle("CHATS & ATENDIMENTO")
-            }
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .widthIn(max = 760.dp)
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+                contentPadding = PaddingValues(top = 8.dp, bottom = 40.dp)
+            ) {
+                // 1. Chat & Support Group
+                item {
+                    SectionTitle("CHATS & ATENDIMENTO")
+                }
 
-            item {
-                ServiceTileCard(
-                    title = "Chat com Clientes (SAC)",
-                    subtitle = "Conversas em tempo real com compradores e clientes da loja",
-                    icon = Icons.Default.Chat,
-                    iconBgColor = CosmicPrimary,
-                    badgeText = "AO VIVO",
-                    onClick = { activeModal = ServiceModalType.CUSTOMER_CHATS },
-                    tag = "tile_customer_chats"
-                )
-            }
-
-            item {
-                ServiceTileCard(
-                    title = "Atendimento e Suporte Nova CRM",
-                    subtitle = "Canal direto de suporte em tempo real com nossa equipe",
-                    icon = Icons.Default.SupportAgent,
-                    iconBgColor = Color(0xFF10B981),
-                    badgeText = "ONLINE",
-                    onClick = { activeModal = ServiceModalType.SUPPORT_CHAT },
-                    tag = "tile_support_chat"
-                )
-            }
-
-            // 2. Sales & Store Management Group
-            item {
-                SectionTitle("GESTÃO DE VENDAS & LOJA")
-            }
-
-            item {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    ServiceGridCard(
-                        title = "Pedidos & Vendas",
-                        infoText = "${crmState.orders.size} registrados",
-                        icon = Icons.Default.ReceiptLong,
-                        color = Color(0xFF3B82F6),
-                        modifier = Modifier.weight(1f),
-                        onClick = { activeModal = ServiceModalType.ORDERS },
-                        tag = "grid_orders"
-                    )
-
-                    ServiceGridCard(
-                        title = "Cupons de Desconto",
-                        infoText = "Promoções ativas",
-                        icon = Icons.Default.ConfirmationNumber,
-                        color = Color(0xFFEC4899),
-                        modifier = Modifier.weight(1f),
-                        onClick = { activeModal = ServiceModalType.COUPONS },
-                        tag = "grid_coupons"
+                item {
+                    ServiceTileCard(
+                        title = "Chat com Clientes (SAC)",
+                        subtitle = "Conversas em tempo real com compradores e clientes da loja",
+                        icon = Icons.Default.Chat,
+                        iconBgColor = CosmicPrimary,
+                        badgeText = "AO VIVO",
+                        onClick = { activeModal = ServiceModalType.CUSTOMER_CHATS },
+                        tag = "tile_customer_chats"
                     )
                 }
-            }
 
-            item {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    ServiceGridCard(
-                        title = "Vitrine & Configurações",
-                        infoText = "Dados da sua loja",
-                        icon = Icons.Default.Storefront,
-                        color = Color(0xFFF59E0B),
-                        modifier = Modifier.weight(1f),
-                        onClick = { activeModal = ServiceModalType.STORE_SETTINGS },
-                        tag = "grid_store_settings"
-                    )
-
-                    ServiceGridCard(
-                        title = "Relatório PDF",
-                        infoText = "Exportar métricas",
-                        icon = Icons.Default.PictureAsPdf,
-                        color = Color(0xFF8B5CF6),
-                        modifier = Modifier.weight(1f),
-                        onClick = {
-                            Toast.makeText(context, "Gerando resumo do relatório...", Toast.LENGTH_SHORT).show()
-                            activeModal = ServiceModalType.REPORT
-                        },
-                        tag = "grid_report"
+                item {
+                    ServiceTileCard(
+                        title = "Atendimento e Suporte Nova CRM",
+                        subtitle = "Canal direto de suporte em tempo real com nossa equipe",
+                        icon = Icons.Default.SupportAgent,
+                        iconBgColor = Color(0xFF10B981),
+                        badgeText = "ONLINE",
+                        onClick = { activeModal = ServiceModalType.SUPPORT_CHAT },
+                        tag = "tile_support_chat"
                     )
                 }
-            }
 
-            // 3. Account & Subscription Section
-            item {
-                SectionTitle("MINHA CONTA & ASSINATURA")
-            }
+                // 2. Sales & Store Management Group
+                item {
+                    SectionTitle("GESTÃO DE VENDAS & LOJA")
+                }
 
-            item {
-                Card(
-                    shape = RoundedCornerShape(14.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f), RoundedCornerShape(14.dp))
-                        .clickable { activeModal = ServiceModalType.ACCOUNT }
-                        .testTag("tile_account")
-                ) {
+                item {
                     Row(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .height(IntrinsicSize.Max)
                     ) {
-                        Box(
+                        ServiceGridCard(
+                            title = "Pedidos & Vendas",
+                            infoText = "${crmState.orders.size} registrados",
+                            icon = Icons.Default.ReceiptLong,
+                            color = Color(0xFF3B82F6),
                             modifier = Modifier
-                                .size(42.dp)
-                                .clip(CircleShape)
-                                .background(CosmicPrimary.copy(alpha = 0.12f)),
-                            contentAlignment = Alignment.Center
+                                .weight(1f)
+                                .fillMaxHeight(),
+                            onClick = { activeModal = ServiceModalType.ORDERS },
+                            tag = "grid_orders"
+                        )
+
+                        ServiceGridCard(
+                            title = "Cupons de Desconto",
+                            infoText = "Promoções ativas",
+                            icon = Icons.Default.ConfirmationNumber,
+                            color = Color(0xFFEC4899),
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight(),
+                            onClick = { activeModal = ServiceModalType.COUPONS },
+                            tag = "grid_coupons"
+                        )
+                    }
+                }
+
+                item {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(IntrinsicSize.Max)
+                    ) {
+                        ServiceGridCard(
+                            title = "Vitrine & Configurações",
+                            infoText = "Dados da sua loja",
+                            icon = Icons.Default.Storefront,
+                            color = Color(0xFFF59E0B),
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight(),
+                            onClick = { activeModal = ServiceModalType.STORE_SETTINGS },
+                            tag = "grid_store_settings"
+                        )
+
+                        ServiceGridCard(
+                            title = "Relatório PDF",
+                            infoText = "Exportar métricas",
+                            icon = Icons.Default.PictureAsPdf,
+                            color = Color(0xFF8B5CF6),
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight(),
+                            onClick = {
+                                Toast.makeText(context, "Gerando resumo do relatório...", Toast.LENGTH_SHORT).show()
+                                activeModal = ServiceModalType.REPORT
+                            },
+                            tag = "grid_report"
+                        )
+                    }
+                }
+
+                // 3. Account & Subscription Section
+                item {
+                    SectionTitle("MINHA CONTA & ASSINATURA")
+                }
+
+                item {
+                    Card(
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f), RoundedCornerShape(14.dp))
+                            .clickable { activeModal = ServiceModalType.ACCOUNT }
+                            .testTag("tile_account")
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.WorkspacePremium,
-                                contentDescription = "Plano",
-                                tint = CosmicPrimary,
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
+                            Box(
+                                modifier = Modifier
+                                    .size(42.dp)
+                                    .clip(CircleShape)
+                                    .background(CosmicPrimary.copy(alpha = 0.12f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.WorkspacePremium,
+                                    contentDescription = "Plano",
+                                    tint = CosmicPrimary,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
 
-                        Spacer(modifier = Modifier.width(12.dp))
+                            Spacer(modifier = Modifier.width(12.dp))
 
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Plano Identificado: $planDisplayName",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = if (isProPlan) "Assinatura PRO ativa • Gerenciar em novacrm.com.br" else "Para alterar o plano, acesse novacrm.com.br",
-                                fontSize = 11.sp,
-                                color = TextMuted
-                            )
-                        }
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(end = 8.dp)
+                            ) {
+                                Text(
+                                    text = "Plano Identificado: $planDisplayName",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = if (isProPlan) "Assinatura PRO ativa • Gerenciar em novacrm.com.br" else "Para alterar o plano, acesse novacrm.com.br",
+                                    fontSize = 11.sp,
+                                    color = TextMuted,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
 
-                        Button(
-                            onClick = { showUpgradeDialog = true },
-                            colors = ButtonDefaults.buttonColors(containerColor = CosmicPrimary),
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
-                        ) {
-                            Text(if (isProPlan) "GERENCIAR" else "MELHORAR", fontSize = 11.sp, fontWeight = FontWeight.Black)
+                            Button(
+                                onClick = { showUpgradeDialog = true },
+                                colors = ButtonDefaults.buttonColors(containerColor = CosmicPrimary),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = if (isProPlan) "GERENCIAR" else "MELHORAR",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Black,
+                                    maxLines = 1,
+                                    softWrap = false
+                                )
+                            }
                         }
                     }
                 }
-            }
 
             // Logout Section
             item {
@@ -441,15 +477,18 @@ fun MoreServicesScreen(
                         text = "Nova CRM Mobile v2.4.0",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
-                        color = TextMuted
+                        color = TextMuted,
+                        textAlign = TextAlign.Center
                     )
                     Text(
-                        text = "Desenvolvido com Google AI Studio • Todos os direitos reservados",
+                        text = "Todos os direitos reservados • novacrm.com.br",
                         fontSize = 10.sp,
-                        color = TextMuted.copy(alpha = 0.7f)
+                        color = TextMuted.copy(alpha = 0.7f),
+                        textAlign = TextAlign.Center
                     )
                 }
             }
+        }
         }
     }
 
@@ -672,6 +711,7 @@ fun FullModalDialog(
     onDismiss: () -> Unit,
     content: @Composable () -> Unit
 ) {
+    BackHandler(onBack = onDismiss)
     Surface(
         modifier = Modifier
             .fillMaxSize()
@@ -731,7 +771,8 @@ fun SupportChatSubScreen(
         bottomBar = {
             Surface(
                 tonalElevation = 3.dp,
-                color = MaterialTheme.colorScheme.surface
+                color = MaterialTheme.colorScheme.surface,
+                modifier = Modifier.imePadding()
             ) {
                 Row(
                     modifier = Modifier
@@ -866,23 +907,32 @@ fun OrdersSubScreen(crmState: CrmUiState, onClose: () -> Unit) {
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Column {
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(end = 12.dp)
+                            ) {
                                 Text(
                                     text = order.customerEmail.ifBlank { "Cliente #" + order.id.take(6) },
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp
+                                    fontSize = 14.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
                                     text = "Status: " + order.status.uppercase(),
                                     fontSize = 11.sp,
-                                    color = if (order.status.lowercase() == "concluído") Color(0xFF10B981) else CosmicPrimary
+                                    color = if (order.status.lowercase() == "concluído") Color(0xFF10B981) else CosmicPrimary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                             Text(
                                 text = "R$ " + String.format(Locale.getDefault(), "%,.2f", order.total),
                                 fontWeight = FontWeight.Black,
                                 fontSize = 16.sp,
-                                color = CosmicPrimary
+                                color = CosmicPrimary,
+                                softWrap = false
                             )
                         }
                     }
@@ -999,45 +1049,56 @@ fun StoreSettingsSubScreen(merchantProfile: com.example.Merchant, onClose: () ->
             )
         }
     ) { padding ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .imePadding(),
+            contentAlignment = Alignment.TopCenter
         ) {
-            OutlinedTextField(
-                value = storeName,
-                onValueChange = { storeName = it },
-                label = { Text("Nome da Loja / Empresa") },
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            OutlinedTextField(
-                value = whatsapp,
-                onValueChange = { whatsapp = it },
-                label = { Text("WhatsApp de Atendimento") },
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            OutlinedTextField(
-                value = category,
-                onValueChange = { category = it },
-                label = { Text("Categoria Principal") },
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Button(
-                onClick = {
-                    Toast.makeText(context, "Configurações da loja salvas com sucesso!", Toast.LENGTH_SHORT).show()
-                    onClose()
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = CosmicPrimary),
-                modifier = Modifier.fillMaxWidth()
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 640.dp)
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text("SALVAR CONFIGURAÇÕES", fontWeight = FontWeight.Bold)
+                OutlinedTextField(
+                    value = storeName,
+                    onValueChange = { storeName = it },
+                    label = { Text("Nome da Loja / Empresa") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = whatsapp,
+                    onValueChange = { whatsapp = it },
+                    label = { Text("WhatsApp de Atendimento") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = category,
+                    onValueChange = { category = it },
+                    label = { Text("Categoria Principal") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Button(
+                    onClick = {
+                        Toast.makeText(context, "Configurações da loja salvas com sucesso!", Toast.LENGTH_SHORT).show()
+                        onClose()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = CosmicPrimary),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                ) {
+                    Text("SALVAR CONFIGURAÇÕES", fontWeight = FontWeight.Bold)
+                }
             }
         }
     }
@@ -1058,25 +1119,33 @@ fun ReportSubScreen(crmState: CrmUiState, totalSales: Double, onClose: () -> Uni
             )
         }
     ) { padding ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(padding),
+            contentAlignment = Alignment.TopCenter
         ) {
-            Card(
-                shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                modifier = Modifier.fillMaxWidth()
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 640.dp)
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Resumo Geral das Operações", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text("• Faturamento Geral: R$ " + String.format(Locale.getDefault(), "%,.2f", totalSales))
-                    Text("• Pedidos Registrados: ${crmState.orders.size}")
-                    Text("• Clientes Cadastrados: ${crmState.clients.size}")
-                    Text("• Itens em Estoque: ${crmState.products.size}")
+                Card(
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("Resumo Geral das Operações", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text("• Faturamento Geral: R$ " + String.format(Locale.getDefault(), "%,.2f", totalSales))
+                        Text("• Pedidos Registrados: ${crmState.orders.size}")
+                        Text("• Clientes Cadastrados: ${crmState.clients.size}")
+                        Text("• Itens em Estoque: ${crmState.products.size}")
+                    }
                 }
             }
         }
@@ -1173,46 +1242,62 @@ fun AccountSubScreen(
             )
         }
     ) { padding ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+                .padding(padding),
+            contentAlignment = Alignment.TopCenter
         ) {
-            Card(
-                shape = RoundedCornerShape(14.dp),
-                modifier = Modifier.fillMaxWidth()
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 640.dp)
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Person, contentDescription = "Conta", tint = CosmicPrimary)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Perfil de Lojista Nova CRM", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Card(
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Person, contentDescription = "Conta", tint = CosmicPrimary)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Perfil de Lojista Nova CRM", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        }
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text("Plano Identificado: $planDisplayName", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = CosmicPrimary)
+                        Text("Status da Conta: Ativa no Servidor", fontSize = 12.sp, color = TextMuted)
                     }
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text("Plano Identificado: $planDisplayName", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = CosmicPrimary)
-                    Text("Status da Conta: Ativa no Servidor", fontSize = 12.sp, color = TextMuted)
                 }
-            }
 
-            Button(
-                onClick = { showUpgradeDialog = true },
-                colors = ButtonDefaults.buttonColors(containerColor = CosmicPrimary),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(if (isProPlan) "GERENCIAR PLANO EM NOVACRM.COM.BR" else "MELHORAR PLANO EM NOVACRM.COM.BR", fontWeight = FontWeight.Bold)
-            }
+                Button(
+                    onClick = { showUpgradeDialog = true },
+                    colors = ButtonDefaults.buttonColors(containerColor = CosmicPrimary),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .defaultMinSize(minHeight = 48.dp)
+                ) {
+                    Text(
+                        text = if (isProPlan) "GERENCIAR PLANO EM NOVACRM.COM.BR" else "MELHORAR PLANO EM NOVACRM.COM.BR",
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                }
 
-            OutlinedButton(
-                onClick = {
-                    onClose()
-                    onSignOutClick()
-                },
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
-            ) {
-                Text("SAIR DA CONTA", fontWeight = FontWeight.Bold)
+                OutlinedButton(
+                    onClick = {
+                        onClose()
+                        onSignOutClick()
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .defaultMinSize(minHeight = 48.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("SAIR DA CONTA", fontWeight = FontWeight.Bold)
+                }
             }
         }
     }
@@ -1343,17 +1428,25 @@ fun CustomerChatsSubScreen(
 
                                     Spacer(modifier = Modifier.width(12.dp))
 
-                                    Column(modifier = Modifier.weight(1f)) {
+                                    Column(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .padding(end = 8.dp)
+                                    ) {
                                         Text(
                                             text = client.name,
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 14.sp,
-                                            color = MaterialTheme.colorScheme.onSurface
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
                                         )
                                         Text(
                                             text = client.email.ifBlank { client.phone.ifBlank { "Cliente registrado" } },
                                             fontSize = 11.sp,
-                                            color = TextMuted
+                                            color = TextMuted,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
                                         )
                                     }
 
@@ -1376,7 +1469,9 @@ fun CustomerChatsSubScreen(
                                                 text = "ABRIR CHAT",
                                                 fontSize = 10.sp,
                                                 fontWeight = FontWeight.Black,
-                                                color = Color.White
+                                                color = Color.White,
+                                                maxLines = 1,
+                                                softWrap = false
                                             )
                                         }
                                     }

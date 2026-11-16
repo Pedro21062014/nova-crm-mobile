@@ -1,6 +1,17 @@
 package com.example.ui
 
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.ImageDecoder
+import android.net.Uri
+import android.os.Build
+import android.util.Base64
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -13,6 +24,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddPhotoAlternate
@@ -20,7 +32,10 @@ import androidx.compose.material.icons.filled.AddShoppingCart
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Category
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Checkroom
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.Edit
@@ -28,6 +43,8 @@ import androidx.compose.material.icons.filled.Image as ImageIcon
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.LocalMall
 import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.Search
@@ -49,18 +66,27 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
 import com.example.CrmUiState
 import com.example.CrmViewModel
 import com.example.Product
 import com.example.R
+import com.example.ui.theme.BorderDark
 import com.example.ui.theme.CosmicBackground
 import com.example.ui.theme.CosmicPrimary
 import com.example.ui.theme.CosmicSecondary
 import com.example.ui.theme.CosmicTertiary
 import com.example.ui.theme.TextMuted
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
 import java.util.Locale
+import kotlin.math.max
+import kotlin.math.roundToInt
 
 data class ImagePreset(val label: String, val category: String, val url: String)
 
@@ -160,82 +186,103 @@ fun ProductsScreen(
         },
         containerColor = CosmicBackground
     ) { padding ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 16.dp)
+                .padding(padding),
+            contentAlignment = Alignment.TopCenter
         ) {
-            // 1. Smart Search Input
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Buscar") },
-                placeholder = { Text("Buscar no estoque por nome ou categoria...", color = TextMuted) },
-                singleLine = true,
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 12.dp)
-                    .testTag("product_search_input"),
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = CosmicPrimary,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                    focusedContainerColor = MaterialTheme.colorScheme.surface,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surface
-                )
-            )
-
-            // 2. Products List
-            if (filteredProducts.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            imageVector = Icons.Default.Inventory2,
-                            contentDescription = "Sem estoque",
-                            tint = TextMuted,
-                            modifier = Modifier.size(64.dp)
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
+                    .fillMaxSize()
+                    .widthIn(max = 760.dp)
+                    .padding(horizontal = 16.dp)
+            ) {
+                // 1. Smart Search Input
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Buscar") },
+                    placeholder = {
                         Text(
-                            text = if (searchQuery.isNotEmpty()) "Nenhum produto encontrado para a busca." else "Sua loja ainda não possui produtos catalogados.",
-                            fontSize = 14.sp,
+                            "Buscar por nome ou categoria...",
                             color = TextMuted,
-                            fontWeight = FontWeight.Medium
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
-                    }
-                }
-            } else {
-                LazyColumn(
+                    },
+                    singleLine = true,
                     modifier = Modifier
-                        .weight(1f)
                         .fillMaxWidth()
-                        .testTag("product_list"),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                    contentPadding = PaddingValues(bottom = 80.dp)
-                ) {
-                    items(filteredProducts.reversed(), key = { it.id }) { item ->
-                        ProductCardRow(
-                            product = item,
-                            onClick = { editingProduct = item },
-                            onIncrement = { viewModel.adjustProductStock(item, 1) },
-                            onDecrement = { viewModel.adjustProductStock(item, -1) }
-                        )
+                        .padding(vertical = 12.dp)
+                        .testTag("product_search_input"),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = CosmicPrimary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                        focusedContainerColor = MaterialTheme.colorScheme.surface,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surface
+                    )
+                )
+
+                // 2. Products List
+                if (filteredProducts.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.padding(horizontal = 24.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Inventory2,
+                                contentDescription = "Sem estoque",
+                                tint = TextMuted,
+                                modifier = Modifier.size(64.dp)
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = if (searchQuery.isNotEmpty()) "Nenhum produto encontrado para a busca." else "Sua loja ainda não possui produtos catalogados.",
+                                fontSize = 14.sp,
+                                color = TextMuted,
+                                fontWeight = FontWeight.Medium,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+                        }
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .testTag("product_list"),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        contentPadding = PaddingValues(bottom = 84.dp)
+                    ) {
+                        items(filteredProducts.reversed(), key = { it.id }) { item ->
+                            ProductCardRow(
+                                product = item,
+                                onClick = { editingProduct = item },
+                                onIncrement = { viewModel.adjustProductStock(item, 1) },
+                                onDecrement = { viewModel.adjustProductStock(item, -1) }
+                            )
+                        }
                     }
                 }
             }
         }
     }
 
-    // Modal adding form Dialog
+    // Responsive Modal adding form Dialog
     if (showAddDialog) {
-        AlertDialog(
-            onDismissRequest = { showAddDialog = false },
+        var isSavingAdd by remember { mutableStateOf(false) }
+        var isProcessingImage by remember { mutableStateOf(false) }
+
+        ResponsiveProductFormDialog(
+            onDismissRequest = { if (!isSavingAdd && !isProcessingImage) showAddDialog = false },
             title = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
@@ -252,55 +299,70 @@ fun ProductsScreen(
                     )
                 }
             },
-            text = {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+            content = {
+                if (formError != null) {
+                    Text(
+                        text = formError!!,
+                        color = MaterialTheme.colorScheme.error,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                ProductPhotoPickerSection(
+                    imageUrl = prodImageUrl,
+                    category = prodCategory,
+                    productName = prodName.ifBlank { "Produto" },
+                    isProcessing = isProcessingImage,
+                    onProcessingChange = { isProcessingImage = it },
+                    onImageSelected = { newImg ->
+                        prodImageUrl = newImg
+                        formError = null
+                    },
+                    onImageError = { err -> formError = err },
+                    urlInputTestTag = "new_product_image_input"
+                )
+
+                OutlinedTextField(
+                    value = prodName,
+                    onValueChange = { prodName = it },
+                    label = { Text("Nome do produto", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("new_product_name_input"),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = CosmicPrimary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                    )
+                )
+
+                OutlinedTextField(
+                    value = prodCategory,
+                    onValueChange = { prodCategory = it },
+                    label = { Text("Categoria", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    placeholder = { Text("Ex: Tecnologia, Moda, Alimentos", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("new_product_category_input"),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = CosmicPrimary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                    )
+                )
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    if (formError != null) {
-                        Text(
-                            text = formError!!,
-                            color = MaterialTheme.colorScheme.error,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    OutlinedTextField(
-                        value = prodName,
-                        onValueChange = { prodName = it },
-                        label = { Text("Nome do produto") },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("new_product_name_input"),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = CosmicPrimary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                        )
-                    )
-
-                    OutlinedTextField(
-                        value = prodCategory,
-                        onValueChange = { prodCategory = it },
-                        label = { Text("Categoria (ex: Tecnologia, Moda, Alimentos)") },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("new_product_category_input"),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = CosmicPrimary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                        )
-                    )
-
                     OutlinedTextField(
                         value = prodPrice,
                         onValueChange = { prodPrice = it },
-                        label = { Text("Preço Unitário (R$)") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        label = { Text("Preço (R$)", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         modifier = Modifier
-                            .fillMaxWidth()
+                            .weight(1f)
                             .testTag("new_product_price_input"),
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
@@ -312,10 +374,10 @@ fun ProductsScreen(
                     OutlinedTextField(
                         value = prodStock,
                         onValueChange = { prodStock = it },
-                        label = { Text("Estoque Inicial") },
+                        label = { Text("Estoque", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier
-                            .fillMaxWidth()
+                            .weight(1f)
                             .testTag("new_product_stock_input"),
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
@@ -323,68 +385,63 @@ fun ProductsScreen(
                             unfocusedBorderColor = MaterialTheme.colorScheme.outline
                         )
                     )
+                }
 
-                    OutlinedTextField(
-                        value = prodImageUrl,
-                        onValueChange = { prodImageUrl = it },
-                        label = { Text("URL da Imagem / Foto (Opcional)") },
-                        leadingIcon = { Icon(Icons.Default.AddPhotoAlternate, contentDescription = "Imagem", tint = CosmicPrimary) },
+                // Quick image sample chips
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        "Ou use uma foto de exemplo:",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextMuted
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .testTag("new_product_image_input"),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = CosmicPrimary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                        )
-                    )
-
-                    // Quick image sample chips
-                    Column {
-                        Text(
-                            "Sugestões de Fotos Rápidas:",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = TextMuted
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            SAMPLE_IMAGE_PRESETS.forEach { preset ->
-                                FilterChip(
-                                    selected = prodImageUrl == preset.url,
-                                    onClick = {
-                                        prodImageUrl = preset.url
-                                        if (prodCategory.isBlank()) prodCategory = preset.category
-                                    },
-                                    label = { Text(preset.label, fontSize = 11.sp) },
-                                    colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = CosmicPrimary.copy(alpha = 0.2f),
-                                        selectedLabelColor = CosmicPrimary
-                                    )
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        SAMPLE_IMAGE_PRESETS.forEach { preset ->
+                            FilterChip(
+                                selected = prodImageUrl == preset.url,
+                                onClick = {
+                                    prodImageUrl = preset.url
+                                    if (prodCategory.isBlank()) prodCategory = preset.category
+                                },
+                                label = { Text(preset.label, fontSize = 11.sp, maxLines = 1) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = CosmicPrimary.copy(alpha = 0.2f),
+                                    selectedLabelColor = CosmicPrimary
                                 )
-                            }
+                            )
                         }
                     }
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showAddDialog = false },
+                    enabled = !isSavingAdd && !isProcessingImage,
+                    modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                ) {
+                    Text("CANCELAR", color = CosmicPrimary, fontWeight = FontWeight.Bold)
                 }
             },
             confirmButton = {
                 Button(
                     onClick = {
-                        val parsedPrice = prodPrice.toDoubleOrNull()
-                        val parsedStock = prodStock.toIntOrNull()
+                        val parsedPrice = prodPrice.replace(",", ".").trim().toDoubleOrNull()
+                        val parsedStock = prodStock.trim().toIntOrNull()
 
                         if (prodName.isBlank() || prodCategory.isBlank()) {
-                            formError = "Preencha todos os campos obrigatórios."
+                            formError = "Preencha nome e categoria obrigatórios."
                         } else if (parsedPrice == null || parsedPrice <= 0.0) {
                             formError = "Insira um preço válido maior que zero."
                         } else if (parsedStock == null || parsedStock < 0) {
                             formError = "O estoque inicial não pode ser negativo."
                         } else {
+                            isSavingAdd = true
                             viewModel.addProduct(
                                 name = prodName.trim(),
                                 price = parsedPrice,
@@ -392,6 +449,7 @@ fun ProductsScreen(
                                 stock = parsedStock,
                                 imageUrl = prodImageUrl.trim()
                             ) { success ->
+                                isSavingAdd = false
                                 if (success) {
                                     showAddDialog = false
                                 } else {
@@ -400,18 +458,23 @@ fun ProductsScreen(
                             }
                         }
                     },
+                    enabled = !isSavingAdd && !isProcessingImage,
                     colors = ButtonDefaults.buttonColors(containerColor = CosmicPrimary),
-                    modifier = Modifier.testTag("submit_product_button")
+                    modifier = Modifier
+                        .defaultMinSize(minHeight = 48.dp)
+                        .testTag("submit_product_button")
                 ) {
-                    Text("SALVAR", fontWeight = FontWeight.Bold, color = Color.White)
+                    if (isSavingAdd) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            color = Color.White,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Text("SALVAR", fontWeight = FontWeight.Bold, color = Color.White)
+                    }
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { showAddDialog = false }) {
-                    Text("CANCELAR", color = CosmicPrimary, fontWeight = FontWeight.Bold)
-                }
-            },
-            containerColor = MaterialTheme.colorScheme.surface
+            }
         )
     }
 
@@ -421,12 +484,13 @@ fun ProductsScreen(
         var editCategory by remember(product) { mutableStateOf(product.category) }
         var editPrice by remember(product) { mutableStateOf(product.price.toString()) }
         var editStock by remember(product) { mutableStateOf(product.stock.toString()) }
-        var editImageUrl by remember(product) { mutableStateOf(product.imageUrl) }
+        var editImageUrl by remember(product) { mutableStateOf(product.imageUrl.ifBlank { product.primaryImage }) }
         var editError by remember(product) { mutableStateOf<String?>(null) }
         var isSaving by remember { mutableStateOf(false) }
+        var isProcessingEditImage by remember { mutableStateOf(false) }
 
-        AlertDialog(
-            onDismissRequest = { if (!isSaving) editingProduct = null },
+        ResponsiveProductFormDialog(
+            onDismissRequest = { if (!isSaving && !isProcessingEditImage) editingProduct = null },
             title = {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -448,96 +512,93 @@ fun ProductsScreen(
                     }
                 }
             },
-            text = {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+            content = {
+                if (editError != null) {
+                    Text(editError!!, color = MaterialTheme.colorScheme.error, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+
+                ProductPhotoPickerSection(
+                    imageUrl = editImageUrl,
+                    category = editCategory,
+                    productName = editName.ifBlank { product.name },
+                    isProcessing = isProcessingEditImage,
+                    onProcessingChange = { isProcessingEditImage = it },
+                    onImageSelected = { newImg ->
+                        editImageUrl = newImg
+                        editError = null
+                    },
+                    onImageError = { err -> editError = err },
+                    urlInputTestTag = "edit_product_image_input"
+                )
+
+                OutlinedTextField(
+                    value = editName,
+                    onValueChange = { editName = it },
+                    label = { Text("Nome do produto", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
+                OutlinedTextField(
+                    value = editCategory,
+                    onValueChange = { editCategory = it },
+                    label = { Text("Categoria", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    // Preview thumbnail box
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(110.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        ProductThumbnail(
-                            product = product.copy(imageUrl = editImageUrl, category = editCategory),
-                            modifier = Modifier.size(90.dp)
-                        )
-                    }
-
-                    if (editError != null) {
-                        Text(editError!!, color = MaterialTheme.colorScheme.error, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    }
-
                     OutlinedTextField(
-                        value = editName,
-                        onValueChange = { editName = it },
-                        label = { Text("Nome do produto") },
-                        modifier = Modifier.fillMaxWidth(),
+                        value = editPrice,
+                        onValueChange = { editPrice = it },
+                        label = { Text("Preço (R$)", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.weight(1f),
                         singleLine = true
                     )
-
                     OutlinedTextField(
-                        value = editCategory,
-                        onValueChange = { editCategory = it },
-                        label = { Text("Categoria") },
-                        modifier = Modifier.fillMaxWidth(),
+                        value = editStock,
+                        onValueChange = { editStock = it },
+                        label = { Text("Estoque", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f),
                         singleLine = true
                     )
+                }
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedTextField(
-                            value = editPrice,
-                            onValueChange = { editPrice = it },
-                            label = { Text("Preço (R$)") },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            modifier = Modifier.weight(1f),
-                            singleLine = true
-                        )
-                        OutlinedTextField(
-                            value = editStock,
-                            onValueChange = { editStock = it },
-                            label = { Text("Estoque") },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            modifier = Modifier.weight(1f),
-                            singleLine = true
+                // Presets in edit
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    SAMPLE_IMAGE_PRESETS.forEach { preset ->
+                        FilterChip(
+                            selected = editImageUrl == preset.url,
+                            onClick = { editImageUrl = preset.url },
+                            label = { Text(preset.label, fontSize = 10.sp, maxLines = 1) }
                         )
                     }
-
-                    OutlinedTextField(
-                        value = editImageUrl,
-                        onValueChange = { editImageUrl = it },
-                        label = { Text("URL da Imagem") },
-                        leadingIcon = { Icon(Icons.Default.AddPhotoAlternate, contentDescription = "Foto", tint = CosmicPrimary) },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-
-                    // Presets in edit
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        SAMPLE_IMAGE_PRESETS.forEach { preset ->
-                            FilterChip(
-                                selected = editImageUrl == preset.url,
-                                onClick = { editImageUrl = preset.url },
-                                label = { Text(preset.label, fontSize = 10.sp) }
-                            )
-                        }
-                    }
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { editingProduct = null },
+                    enabled = !isSaving && !isProcessingEditImage,
+                    modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                ) {
+                    Text("FECHAR", color = CosmicPrimary, fontWeight = FontWeight.Bold)
                 }
             },
             confirmButton = {
                 Button(
                     onClick = {
-                        val parsedPrice = editPrice.toDoubleOrNull()
-                        val parsedStock = editStock.toIntOrNull()
+                        val parsedPrice = editPrice.replace(",", ".").trim().toDoubleOrNull()
+                        val parsedStock = editStock.trim().toIntOrNull()
                         if (editName.isBlank() || editCategory.isBlank()) {
                             editError = "Preencha todos os campos obrigatórios."
                         } else if (parsedPrice == null || parsedPrice <= 0.0) {
@@ -563,17 +624,412 @@ fun ProductsScreen(
                             }
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = CosmicPrimary)
+                    enabled = !isSaving && !isProcessingEditImage,
+                    colors = ButtonDefaults.buttonColors(containerColor = CosmicPrimary),
+                    modifier = Modifier.defaultMinSize(minHeight = 48.dp)
                 ) {
-                    Text("ATUALIZAR", fontWeight = FontWeight.Bold, color = Color.White)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { editingProduct = null }) {
-                    Text("FECHAR", color = CosmicPrimary, fontWeight = FontWeight.Bold)
+                    if (isSaving) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            color = Color.White,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Text("ATUALIZAR", fontWeight = FontWeight.Bold, color = Color.White)
+                    }
                 }
             }
         )
+    }
+}
+
+@Composable
+private fun ResponsiveProductFormDialog(
+    onDismissRequest: () -> Unit,
+    title: @Composable () -> Unit,
+    content: @Composable ColumnScope.() -> Unit,
+    dismissButton: @Composable () -> Unit,
+    confirmButton: @Composable () -> Unit
+) {
+    Dialog(
+        onDismissRequest = onDismissRequest,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxSize()
+                .imePadding()
+                .padding(horizontal = 16.dp, vertical = 20.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Surface(
+                shape = RoundedCornerShape(24.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 4.dp,
+                shadowElevation = 12.dp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 500.dp)
+                    .heightIn(max = maxHeight)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 18.dp)
+                ) {
+                    title()
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f, fill = false)
+                            .verticalScroll(rememberScrollState()),
+                        content = content
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        dismissButton()
+                        Spacer(modifier = Modifier.width(8.dp))
+                        confirmButton()
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProductPhotoPickerSection(
+    imageUrl: String,
+    category: String,
+    productName: String,
+    isProcessing: Boolean,
+    onProcessingChange: (Boolean) -> Unit,
+    onImageSelected: (String) -> Unit,
+    onImageError: (String) -> Unit,
+    urlInputTestTag: String
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val isUploadedLocalImage = imageUrl.startsWith("data:image/", ignoreCase = true)
+
+    // Zero-permission Android Photo Picker (Google Play policy compliant)
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            onProcessingChange(true)
+            scope.launch {
+                val encoded = encodeImageUriToDataUrl(context, uri)
+                onProcessingChange(false)
+                if (encoded != null) {
+                    onImageSelected(encoded)
+                } else {
+                    onImageError("Não foi possível carregar a foto selecionada.")
+                }
+            }
+        }
+    }
+
+    // System Camera quick capture (returns Bitmap via Intent without requiring CAMERA permission)
+    val cameraPreviewLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicturePreview()
+    ) { bitmap: Bitmap? ->
+        if (bitmap != null) {
+            onProcessingChange(true)
+            scope.launch {
+                val encoded = withContext(Dispatchers.IO) {
+                    encodeBitmapToDataUrl(bitmap)
+                }
+                onProcessingChange(false)
+                if (encoded != null) {
+                    onImageSelected(encoded)
+                } else {
+                    onImageError("Não foi possível processar a foto da câmera.")
+                }
+            }
+        }
+    }
+
+    Column(
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+            shape = RoundedCornerShape(14.dp),
+            border = BorderStroke(1.dp, BorderDark),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Live Image Preview Box
+                Box(
+                    modifier = Modifier.size(84.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    ProductThumbnail(
+                        product = Product(
+                            name = productName,
+                            category = category,
+                            imageUrl = imageUrl
+                        ),
+                        modifier = Modifier.size(84.dp)
+                    )
+
+                    if (isProcessing) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color.Black.copy(alpha = 0.45f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                color = Color.White,
+                                strokeWidth = 2.5.dp
+                            )
+                        }
+                    } else if (imageUrl.isNotBlank()) {
+                        Surface(
+                            onClick = { onImageSelected("") },
+                            shape = CircleShape,
+                            color = Color.Black.copy(alpha = 0.65f),
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(4.dp)
+                                .size(24.dp)
+                                .testTag("remove_product_photo_button")
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Remover foto",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Upload & Camera Action Buttons
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    FilledTonalButton(
+                        onClick = {
+                            photoPickerLauncher.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                            )
+                        },
+                        enabled = !isProcessing,
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = CosmicPrimary.copy(alpha = 0.12f),
+                            contentColor = CosmicPrimary
+                        ),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .defaultMinSize(minHeight = 42.dp)
+                            .testTag("upload_product_photo_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PhotoLibrary,
+                            contentDescription = "Selecionar foto da galeria",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (imageUrl.isBlank()) "Enviar foto" else "Trocar foto",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    OutlinedButton(
+                        onClick = { cameraPreviewLauncher.launch(null) },
+                        enabled = !isProcessing,
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.dp, BorderDark),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .defaultMinSize(minHeight = 40.dp)
+                            .testTag("camera_product_photo_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PhotoCamera,
+                            contentDescription = "Tirar foto com a câmera",
+                            tint = TextMuted,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Tirar foto",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1
+                        )
+                    }
+                }
+            }
+        }
+
+        if (isUploadedLocalImage) {
+            Surface(
+                color = CosmicSecondary.copy(alpha = 0.12f),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CheckCircle,
+                        contentDescription = null,
+                        tint = CosmicSecondary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Foto selecionada",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF065F46),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Usar URL",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = CosmicPrimary,
+                        maxLines = 1,
+                        softWrap = false,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .clickable { onImageSelected("") }
+                            .padding(horizontal = 6.dp, vertical = 4.dp)
+                    )
+                }
+            }
+        } else {
+            OutlinedTextField(
+                value = imageUrl,
+                onValueChange = onImageSelected,
+                label = {
+                    Text(
+                        "URL da imagem (Opcional)",
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                },
+                leadingIcon = {
+                    Icon(
+                        Icons.Default.AddPhotoAlternate,
+                        contentDescription = "URL da imagem",
+                        tint = CosmicPrimary
+                    )
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag(urlInputTestTag),
+                singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = CosmicPrimary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                )
+            )
+        }
+    }
+}
+
+private suspend fun encodeImageUriToDataUrl(context: Context, uri: Uri): String? = withContext(Dispatchers.IO) {
+    try {
+        val rawBitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val source = ImageDecoder.createSource(context.contentResolver, uri)
+            ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
+                decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+                val maxSide = max(info.size.width, info.size.height)
+                if (maxSide > 720) {
+                    val scale = 720f / maxSide.toFloat()
+                    decoder.setTargetSize(
+                        (info.size.width * scale).roundToInt().coerceAtLeast(1),
+                        (info.size.height * scale).roundToInt().coerceAtLeast(1)
+                    )
+                }
+            }
+        } else {
+            val boundsOptions = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            context.contentResolver.openInputStream(uri)?.use { stream ->
+                BitmapFactory.decodeStream(stream, null, boundsOptions)
+            }
+            var sampleSize = 1
+            val maxDim = max(boundsOptions.outWidth, boundsOptions.outHeight)
+            while (maxDim / sampleSize > 1080) {
+                sampleSize *= 2
+            }
+            val decodeOptions = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+            context.contentResolver.openInputStream(uri)?.use { stream ->
+                BitmapFactory.decodeStream(stream, null, decodeOptions)
+            }
+        } ?: return@withContext null
+
+        encodeBitmapToDataUrl(rawBitmap)
+    } catch (e: Exception) {
+        null
+    }
+}
+
+private fun encodeBitmapToDataUrl(bitmap: Bitmap): String? {
+    return try {
+        val maxSide = max(bitmap.width, bitmap.height)
+        val scaled = if (maxSide > 640) {
+            val ratio = 640f / maxSide.toFloat()
+            Bitmap.createScaledBitmap(
+                bitmap,
+                (bitmap.width * ratio).roundToInt().coerceAtLeast(1),
+                (bitmap.height * ratio).roundToInt().coerceAtLeast(1),
+                true
+            )
+        } else {
+            bitmap
+        }
+
+        val output = ByteArrayOutputStream()
+        var quality = 80
+        scaled.compress(Bitmap.CompressFormat.JPEG, quality, output)
+        while (output.size() > 240_000 && quality > 35) {
+            output.reset()
+            quality -= 15
+            scaled.compress(Bitmap.CompressFormat.JPEG, quality, output)
+        }
+        val base64 = Base64.encodeToString(output.toByteArray(), Base64.NO_WRAP)
+        "data:image/jpeg;base64,$base64"
+    } catch (e: Exception) {
+        null
     }
 }
 

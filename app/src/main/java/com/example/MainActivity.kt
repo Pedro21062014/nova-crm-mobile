@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -43,7 +44,7 @@ import com.example.ui.theme.TextMuted
 import com.example.ui.theme.MyApplicationTheme
 
 enum class MainTab(val title: String, val iconRes: Int, val tag: String) {
-    DASHBOARD("Métricas", R.drawable.ic_nav_dashboard, "tab_dashboard"),
+    DASHBOARD("Início", R.drawable.ic_nav_dashboard, "tab_dashboard"),
     PRODUCTS("Estoque", R.drawable.ic_nav_products, "tab_products"),
     CLIENTS("Clientes", R.drawable.ic_nav_clients, "tab_clients"),
     MORE("Mais", R.drawable.ic_nav_more, "tab_more")
@@ -159,10 +160,10 @@ fun MainHubScreen(
         bottomBar = {
             NavigationBar(
                 containerColor = MaterialTheme.colorScheme.surface,
+                windowInsets = NavigationBarDefaults.windowInsets,
                 modifier = Modifier
                     .fillMaxWidth()
                     .border(width = 1.dp, color = BorderDark.copy(alpha = 0.8f))
-                    .navigationBarsPadding()
                     .testTag("main_bottom_nav"),
                 tonalElevation = 0.dp
             ) {
@@ -183,7 +184,10 @@ fun MainHubScreen(
                             Text(
                                 text = tab.title,
                                 fontSize = 11.sp,
-                                fontWeight = if (isSelected) FontWeight.Black else FontWeight.SemiBold
+                                fontWeight = if (isSelected) FontWeight.Black else FontWeight.SemiBold,
+                                maxLines = 1,
+                                softWrap = false,
+                                overflow = TextOverflow.Ellipsis
                             )
                         },
                         colors = NavigationBarItemDefaults.colors(
@@ -208,6 +212,7 @@ fun MainHubScreen(
                     DashboardScreen(
                         state = crmState,
                         totalSales = totalSales,
+                        onRefresh = { crmVm.refreshDashboard() },
                         onSignOutClick = onLogout
                     )
                 }

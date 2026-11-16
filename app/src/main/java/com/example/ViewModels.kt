@@ -4,6 +4,8 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -22,6 +24,9 @@ class AuthViewModel : ViewModel() {
     private val _authState = MutableStateFlow<AuthState>(AuthState.Idle)
     val authState: StateFlow<AuthState> = _authState.asStateFlow()
 
+    private val _resetMessage = MutableStateFlow<String?>(null)
+    val resetMessage: StateFlow<String?> = _resetMessage.asStateFlow()
+
     init {
         checkCurrentUser()
     }
@@ -35,9 +40,22 @@ class AuthViewModel : ViewModel() {
         }
     }
 
+    fun clearFeedback() {
+        if (_authState.value is AuthState.Error) {
+            _authState.value = AuthState.Idle
+        }
+        _resetMessage.value = null
+    }
+
+    fun setValidationError(message: String) {
+        _resetMessage.value = null
+        _authState.value = AuthState.Error(message)
+    }
+
     fun login(email: String, password: String) {
+        _resetMessage.value = null
         if (email.isBlank() || password.isBlank()) {
-            _authState.value = AuthState.Error("Preencha todos os campos")
+            _authState.value = AuthState.Error("Preencha e-mail e senha para entrar.")
             return
         }
         _authState.value = AuthState.Loading
@@ -47,13 +65,22 @@ class AuthViewModel : ViewModel() {
                 _authState.value = AuthState.Success(uid)
             }
             .addOnFailureListener { exception ->
-                _authState.value = AuthState.Error(exception.localizedMessage ?: "Falha ao realizar login")
+                _authState.value = AuthState.Error(mapFirebaseAuthError(exception, isSignUp = false))
             }
     }
 
-    fun signUp(email: String, password: String) {
+    fun signUp(email: String, password: String, confirmPassword: String = password) {
+        _resetMessage.value = null
         if (email.isBlank() || password.isBlank()) {
-            _authState.value = AuthState.Error("Preencha todos os campos")
+            _authState.value = AuthState.Error("Preencha todos os campos para criar sua conta.")
+            return
+        }
+        if (password.length < 6) {
+            _authState.value = AuthState.Error("A senha deve ter pelo menos 6 caracteres.")
+            return
+        }
+        if (password != confirmPassword) {
+            _authState.value = AuthState.Error("As senhas informadas não coincidem.")
             return
         }
         _authState.value = AuthState.Loading
@@ -63,13 +90,50 @@ class AuthViewModel : ViewModel() {
                 _authState.value = AuthState.Success(uid)
             }
             .addOnFailureListener { exception ->
-                _authState.value = AuthState.Error(exception.localizedMessage ?: "Falha ao realizar cadastro")
+                _authState.value = AuthState.Error(mapFirebaseAuthError(exception, isSignUp = true))
+            }
+    }
+
+    fun sendPasswordReset(email: String) {
+        val trimmed = email.trim()
+        if (trimmed.isBlank()) {
+            _authState.value = AuthState.Error("Informe seu e-mail para recuperar a senha.")
+            return
+        }
+        _authState.value = AuthState.Loading
+        FirebaseService.getAuth().sendPasswordResetEmail(trimmed)
+            .addOnSuccessListener {
+                _authState.value = AuthState.Idle
+                _resetMessage.value = "Enviamos um link de redefinição para $trimmed."
+            }
+            .addOnFailureListener { exception ->
+                _authState.value = AuthState.Error(mapFirebaseAuthError(exception, isSignUp = false))
             }
     }
 
     fun signOut() {
         FirebaseService.getAuth().signOut()
         _authState.value = AuthState.Idle
+        _resetMessage.value = null
+    }
+
+    private fun mapFirebaseAuthError(exception: Exception, isSignUp: Boolean): String {
+        val raw = exception.localizedMessage.orEmpty().lowercase()
+        return when {
+            "badly formatted" in raw || "invalid-email" in raw ->
+                "Formato de e-mail inválido."
+            "email-already-in-use" in raw || "already in use" in raw ->
+                "Este e-mail já está cadastrado. Tente entrar."
+            "weak-password" in raw || "at least 6" in raw ->
+                "Escolha uma senha com pelo menos 6 caracteres."
+            "wrong-password" in raw || "invalid-credential" in raw || "incorrect" in raw || "user-not-found" in raw || "no user record" in raw ->
+                "E-mail ou senha incorretos."
+            "network" in raw ->
+                "Sem conexão com a internet. Verifique sua rede."
+            "too-many-requests" in raw ->
+                "Muitas tentativas seguidas. Aguarde um instante."
+            else -> exception.localizedMessage ?: if (isSignUp) "Falha ao realizar cadastro" else "Falha ao realizar login"
+        }
     }
 }
 
@@ -80,6 +144,7 @@ data class CrmUiState(
     val orders: List<Order> = emptyList(),
     val clients: List<Client> = emptyList(),
     val isLoading: Boolean = false,
+    val isRefreshing: Boolean = false,
     val errorMessage: String? = null
 )
 
@@ -88,6 +153,7 @@ class CrmViewModel : ViewModel() {
     val uiState: StateFlow<CrmUiState> = _uiState.asStateFlow()
 
     private var activeMerchantId: String? = null
+    private var streamJobs: List<Job> = emptyList()
 
     init {
         // Automatically hook streams if user already logged in
@@ -99,9 +165,10 @@ class CrmViewModel : ViewModel() {
 
     fun loadMerchantData(merchantId: String) {
         activeMerchantId = merchantId
+        streamJobs.forEach { it.cancel() }
         _uiState.update { it.copy(isLoading = true, errorMessage = null) }
-        
-        viewModelScope.launch {
+
+        val productsJob = viewModelScope.launch {
             try {
                 // Fetch Profile once
                 val profile = FirebaseService.getMerchantProfile(merchantId)
@@ -109,26 +176,45 @@ class CrmViewModel : ViewModel() {
 
                 // Collect Products Flow
                 FirebaseService.streamProducts(merchantId).collectLatest { prods ->
-                    _uiState.update { it.copy(products = prods) }
+                    _uiState.update { it.copy(products = prods, isLoading = false) }
                 }
             } catch (e: Exception) {
-                _uiState.update { it.copy(errorMessage = e.localizedMessage) }
-            } finally {
-                _uiState.update { it.copy(isLoading = false) }
+                _uiState.update { it.copy(errorMessage = e.localizedMessage, isLoading = false) }
             }
         }
 
-        viewModelScope.launch {
+        val ordersJob = viewModelScope.launch {
             // Collect Orders Flow
             FirebaseService.streamOrders(merchantId).collectLatest { ords ->
                 _uiState.update { it.copy(orders = ords) }
             }
         }
 
-        viewModelScope.launch {
+        val clientsJob = viewModelScope.launch {
             // Collect Clients Flow
             FirebaseService.streamClients(merchantId).collectLatest { clis ->
                 _uiState.update { it.copy(clients = clis) }
+            }
+        }
+
+        streamJobs = listOf(productsJob, ordersJob, clientsJob)
+    }
+
+    fun refreshDashboard() {
+        val uid = activeMerchantId ?: FirebaseService.getCurrentMerchantId() ?: return
+        if (_uiState.value.isRefreshing) return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isRefreshing = true, errorMessage = null) }
+            try {
+                val profile = FirebaseService.getMerchantProfile(uid)
+                _uiState.update { it.copy(merchantProfile = profile) }
+                loadMerchantData(uid)
+                delay(450)
+            } catch (e: Exception) {
+                _uiState.update { it.copy(errorMessage = e.localizedMessage) }
+            } finally {
+                _uiState.update { it.copy(isRefreshing = false) }
             }
         }
     }

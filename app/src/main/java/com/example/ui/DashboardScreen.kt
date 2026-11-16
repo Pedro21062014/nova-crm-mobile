@@ -16,6 +16,9 @@ import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,8 +55,11 @@ import java.util.Locale
 fun DashboardScreen(
     state: CrmUiState,
     totalSales: Double,
+    onRefresh: () -> Unit = {},
     onSignOutClick: () -> Unit
 ) {
+    val pullToRefreshState = rememberPullToRefreshState()
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -77,7 +83,7 @@ fun DashboardScreen(
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
                             Text(
-                                text = "Dashboard",
+                                text = "Início",
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight.Black,
                                 color = MaterialTheme.colorScheme.onBackground
@@ -110,133 +116,170 @@ fun DashboardScreen(
         },
         containerColor = CosmicBackground
     ) { padding ->
-        LazyColumn(
+        PullToRefreshBox(
+            isRefreshing = state.isRefreshing,
+            onRefresh = onRefresh,
+            state = pullToRefreshState,
+            indicator = {
+                PullToRefreshDefaults.Indicator(
+                    state = pullToRefreshState,
+                    isRefreshing = state.isRefreshing,
+                    color = CosmicPrimary,
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    modifier = Modifier.align(Alignment.TopCenter)
+                )
+            },
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .testTag("dashboard_pull_to_refresh")
         ) {
-            // 1. Total Sales Hero Card
-            item {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    shape = RoundedCornerShape(18.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.TopCenter
+            ) {
+                LazyColumn(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("total_sales_card")
-                        .border(1.dp, BorderDark.copy(alpha = 0.5f), RoundedCornerShape(18.dp))
+                        .fillMaxSize()
+                        .widthIn(max = 760.dp)
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    Box(
+                // 1. Total Sales Hero Card
+                item {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        shape = RoundedCornerShape(18.dp),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(
-                                Brush.radialGradient(
-                                    colors = listOf(
-                                        CosmicPrimary.copy(alpha = 0.08f),
-                                        Color.Transparent
-                                    ),
-                                    center = Offset(200f, 0f),
-                                    radius = 450f
-                                )
-                            )
-                            .padding(24.dp)
+                            .testTag("total_sales_card")
+                            .border(1.dp, BorderDark.copy(alpha = 0.5f), RoundedCornerShape(18.dp))
                     ) {
-                        Column {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "Vendas Totais Concluídas",
-                                    fontSize = 14.sp,
-                                    color = TextMuted,
-                                    fontWeight = FontWeight.Medium
-                                )
-                                Box(
-                                    modifier = Modifier
-                                        .size(36.dp)
-                                        .background(
-                                            CosmicPrimary.copy(alpha = 0.1f),
-                                            shape = CircleShape
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    Brush.radialGradient(
+                                        colors = listOf(
+                                            CosmicPrimary.copy(alpha = 0.08f),
+                                            Color.Transparent
                                         ),
-                                    contentAlignment = Alignment.Center
+                                        center = Offset(200f, 0f),
+                                        radius = 450f
+                                    )
+                                )
+                                .padding(24.dp)
+                        ) {
+                            Column {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.ShoppingCart,
-                                        contentDescription = "Vendas",
-                                        tint = CosmicPrimary,
-                                        modifier = Modifier.size(18.dp)
+                                    Text(
+                                        text = "Vendas Totais Concluídas",
+                                        fontSize = 14.sp,
+                                        color = TextMuted,
+                                        fontWeight = FontWeight.Medium,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .padding(end = 8.dp)
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .background(
+                                                CosmicPrimary.copy(alpha = 0.1f),
+                                                shape = CircleShape
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.ShoppingCart,
+                                            contentDescription = "Vendas",
+                                            tint = CosmicPrimary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                Text(
+                                    text = "R$ " + String.format(Locale.getDefault(), "%,.2f", totalSales),
+                                    fontSize = 32.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    letterSpacing = (-0.5).sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+
+                                Spacer(modifier = Modifier.height(14.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Pedidos Concluídos",
+                                        fontSize = 12.sp,
+                                        color = TextMuted
+                                    )
+                                    val completedCount = state.orders.count { it.status.lowercase() == "concluído" || it.status.lowercase() == "completed" }
+                                    Text(
+                                        text = "$completedCount pedidos",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = CosmicSecondary
                                     )
                                 }
-                            }
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            Text(
-                                text = "R$ " + String.format(Locale.getDefault(), "%,.2f", totalSales),
-                                fontSize = 32.sp,
-                                fontWeight = FontWeight.Black,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                letterSpacing = (-0.5).sp
-                            )
-
-                            Spacer(modifier = Modifier.height(14.dp))
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "Pedidos Concluídos",
-                                    fontSize = 12.sp,
-                                    color = TextMuted
-                                )
-                                val completedCount = state.orders.count { it.status.lowercase() == "concluído" || it.status.lowercase() == "completed" }
-                                Text(
-                                    text = "$completedCount pedidos",
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = CosmicSecondary
-                                )
                             }
                         }
                     }
                 }
-            }
 
-            // 2. Quick Metrict Grid (3 cards in Row)
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    MetricMiniCard(
-                        title = "Estoque",
-                        count = state.products.size.toString(),
-                        icon = Icons.Default.Inventory,
-                        tint = CosmicTertiary,
-                        modifier = Modifier.weight(1f)
-                    )
-                    MetricMiniCard(
-                        title = "Clientes",
-                        count = state.clients.size.toString(),
-                        icon = Icons.Default.Group,
-                        tint = CosmicSecondary,
-                        modifier = Modifier.weight(1f)
-                    )
-                    MetricMiniCard(
-                        title = "Pedidos",
-                        count = state.orders.size.toString(),
-                        icon = Icons.Default.ReceiptLong,
-                        tint = CosmicPrimary,
-                        modifier = Modifier.weight(1f)
-                    )
+                // 2. Quick Metrict Grid (3 cards in Row)
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(IntrinsicSize.Max),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        MetricMiniCard(
+                            title = "Estoque",
+                            count = state.products.size.toString(),
+                            icon = Icons.Default.Inventory,
+                            tint = CosmicTertiary,
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                        )
+                        MetricMiniCard(
+                            title = "Clientes",
+                            count = state.clients.size.toString(),
+                            icon = Icons.Default.Group,
+                            tint = CosmicSecondary,
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                        )
+                        MetricMiniCard(
+                            title = "Pedidos",
+                            count = state.orders.size.toString(),
+                            icon = Icons.Default.ReceiptLong,
+                            tint = CosmicPrimary,
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                        )
+                    }
                 }
-            }
 
             // 3. Canvas Sales Status Distribution Chart (Elegant Radial Ring Chart)
             item {
@@ -263,106 +306,129 @@ fun DashboardScreen(
                             modifier = Modifier.padding(bottom = 16.dp)
                         )
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            // Radial Ring Draw
-                            Box(
-                                modifier = Modifier
-                                    .size(110.dp)
-                                    .testTag("sales_radial_chart"),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Canvas(modifier = Modifier.fillMaxSize()) {
-                                    val strokeWidth = 32f
-                                    val size = Size(size.width - strokeWidth, size.height - strokeWidth)
-                                    val offset = Offset(strokeWidth / 2, strokeWidth / 2)
+                        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                            val stackVertically = maxWidth < 290.dp
+                            val ringBox: @Composable () -> Unit = {
+                                Box(
+                                    modifier = Modifier
+                                        .size(110.dp)
+                                        .testTag("sales_radial_chart"),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Canvas(modifier = Modifier.fillMaxSize()) {
+                                        val strokeWidth = 32f
+                                        val size = Size(size.width - strokeWidth, size.height - strokeWidth)
+                                        val offset = Offset(strokeWidth / 2, strokeWidth / 2)
 
-                                    if (totalOrders == 0) {
-                                        // Empty state circle
-                                        drawArc(
-                                            color = Color.DarkGray,
-                                            startAngle = 0f,
-                                            sweepAngle = 360f,
-                                            useCenter = false,
-                                            style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
-                                            topLeft = offset,
-                                            size = size
-                                        )
-                                    } else {
-                                        val sweepComp = (completed.toFloat() / totalOrders) * 360f
-                                        val sweepPend = (pending.toFloat() / totalOrders) * 360f
-                                        val sweepCanc = (cancelled.toFloat() / totalOrders) * 360f
-
-                                        var startAngle = -90f
-
-                                        if (sweepComp > 0) {
+                                        if (totalOrders == 0) {
                                             drawArc(
-                                                color = CosmicPrimary,
-                                                startAngle = startAngle,
-                                                sweepAngle = sweepComp,
+                                                color = Color.DarkGray,
+                                                startAngle = 0f,
+                                                sweepAngle = 360f,
                                                 useCenter = false,
                                                 style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
                                                 topLeft = offset,
                                                 size = size
                                             )
-                                            startAngle += sweepComp
-                                        }
+                                        } else {
+                                            val sweepComp = (completed.toFloat() / totalOrders) * 360f
+                                            val sweepPend = (pending.toFloat() / totalOrders) * 360f
+                                            val sweepCanc = (cancelled.toFloat() / totalOrders) * 360f
 
-                                        if (sweepPend > 0) {
-                                            drawArc(
-                                                color = Color(0xFFF7B500),
-                                                startAngle = startAngle,
-                                                sweepAngle = sweepPend,
-                                                useCenter = false,
-                                                style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
-                                                topLeft = offset,
-                                                size = size
-                                            )
-                                            startAngle += sweepPend
-                                        }
+                                            var startAngle = -90f
 
-                                        if (sweepCanc > 0) {
-                                            drawArc(
-                                                color = Color(0xFFE02020),
-                                                startAngle = startAngle,
-                                                sweepAngle = sweepCanc,
-                                                useCenter = false,
-                                                style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
-                                                topLeft = offset,
-                                                size = size
-                                            )
+                                            if (sweepComp > 0) {
+                                                drawArc(
+                                                    color = CosmicPrimary,
+                                                    startAngle = startAngle,
+                                                    sweepAngle = sweepComp,
+                                                    useCenter = false,
+                                                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
+                                                    topLeft = offset,
+                                                    size = size
+                                                )
+                                                startAngle += sweepComp
+                                            }
+
+                                            if (sweepPend > 0) {
+                                                drawArc(
+                                                    color = Color(0xFFF7B500),
+                                                    startAngle = startAngle,
+                                                    sweepAngle = sweepPend,
+                                                    useCenter = false,
+                                                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
+                                                    topLeft = offset,
+                                                    size = size
+                                                )
+                                                startAngle += sweepPend
+                                            }
+
+                                            if (sweepCanc > 0) {
+                                                drawArc(
+                                                    color = Color(0xFFE02020),
+                                                    startAngle = startAngle,
+                                                    sweepAngle = sweepCanc,
+                                                    useCenter = false,
+                                                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
+                                                    topLeft = offset,
+                                                    size = size
+                                                )
+                                            }
                                         }
                                     }
-                                }
 
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text(
-                                        text = "$totalOrders",
-                                        fontSize = 18.sp,
-                                        fontWeight = FontWeight.Black,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Text(
-                                        text = "Total",
-                                        fontSize = 10.sp,
-                                        color = TextMuted
-                                    )
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Text(
+                                            text = "$totalOrders",
+                                            fontSize = 18.sp,
+                                            fontWeight = FontWeight.Black,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            text = "Total",
+                                            fontSize = 10.sp,
+                                            color = TextMuted
+                                        )
+                                    }
                                 }
                             }
 
-                            // Chart Legend Column
-                            Column(
-                                modifier = Modifier
-                                    .padding(start = 16.dp)
-                                    .weight(1f),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                LegendItem(color = CosmicPrimary, label = "Concluído", count = completed, total = totalOrders)
-                                LegendItem(color = Color(0xFFF7B500), label = "Pendente", count = pending, total = totalOrders)
-                                LegendItem(color = Color(0xFFE02020), label = "Cancelado", count = cancelled, total = totalOrders)
+                            if (stackVertically) {
+                                Column(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                                ) {
+                                    ringBox()
+                                    Column(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        LegendItem(color = CosmicPrimary, label = "Concluído", count = completed, total = totalOrders)
+                                        LegendItem(color = Color(0xFFF7B500), label = "Pendente", count = pending, total = totalOrders)
+                                        LegendItem(color = Color(0xFFE02020), label = "Cancelado", count = cancelled, total = totalOrders)
+                                    }
+                                }
+                            } else {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    ringBox()
+
+                                    // Chart Legend Column
+                                    Column(
+                                        modifier = Modifier
+                                            .padding(start = 16.dp)
+                                            .weight(1f),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        LegendItem(color = CosmicPrimary, label = "Concluído", count = completed, total = totalOrders)
+                                        LegendItem(color = Color(0xFFF7B500), label = "Pendente", count = pending, total = totalOrders)
+                                        LegendItem(color = Color(0xFFE02020), label = "Cancelado", count = cancelled, total = totalOrders)
+                                    }
+                                }
                             }
                         }
                     }
@@ -412,6 +478,8 @@ fun DashboardScreen(
                 Spacer(modifier = Modifier.height(24.dp))
             }
         }
+            }
+        }
     }
 }
 
@@ -454,7 +522,9 @@ fun MetricMiniCard(
                 text = title,
                 fontSize = 11.sp,
                 color = TextMuted,
-                fontWeight = FontWeight.Medium
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }
@@ -468,7 +538,12 @@ fun LegendItem(color: Color, label: String, count: Int, total: Int) {
         horizontalArrangement = Arrangement.SpaceBetween,
         modifier = Modifier.fillMaxWidth()
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .weight(1f)
+                .padding(end = 6.dp)
+        ) {
             Box(
                 modifier = Modifier
                     .size(10.dp)
@@ -479,14 +554,17 @@ fun LegendItem(color: Color, label: String, count: Int, total: Int) {
                 text = label,
                 fontSize = 12.sp,
                 color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.Medium
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
         Text(
             text = "$count ($percentage%)",
             fontSize = 12.sp,
             color = TextMuted,
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.Bold,
+            softWrap = false
         )
     }
 }
@@ -509,7 +587,11 @@ fun OrderRowItem(order: Order) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Column(modifier = Modifier.weight(1f)) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(end = 12.dp)
+            ) {
                 Text(
                     text = order.customerEmail,
                     fontSize = 14.sp,
@@ -531,7 +613,8 @@ fun OrderRowItem(order: Order) {
                     text = "R$ " + String.format(Locale.getDefault(), "%.2f", order.total),
                     fontSize = 15.sp,
                     fontWeight = FontWeight.ExtraBold,
-                    color = CosmicPrimary
+                    color = CosmicPrimary,
+                    softWrap = false
                 )
                 
                 OrderStatusPill(status = order.status)
